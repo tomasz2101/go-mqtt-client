@@ -1,23 +1,16 @@
 package mqttclient
 
 import (
-	// "encoding/json"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net"
 	"os"
 	"strings"
-
-	// "sync"
-
-	// "net"
-	// "strings"
-
-	// "os"
 	"time"
-	"github.com/tomasz2101/go-healpers"
+
 	mqtt "github.com/eclipse/paho.mqtt.golang"
+	"github.com/tomasz2101/go-helpers"
 )
 
 // Client will do something
@@ -61,17 +54,6 @@ func (mqtt_client Client) Listen(topic string) {
 	})
 }
 
-// Publish will do something
-func (mqtt_client Client) Publish(client mqtt.Client, topic string, message string) {
-	fmt.Println("Publish")
-	token := client.Publish(topic, 2, false, message)
-	fmt.Println("Publish123123")
-	token.Wait()
-	if token.Error() != nil {
-		log.Fatal(token.Error())
-	}
-}
-
 // EndConnection will disconnect client from broker
 func (mqtt_client Client) EndConnection(client mqtt.Client) {
 	client.Disconnect(250)
@@ -87,34 +69,62 @@ type deviceInfo struct {
 type mqttMessage struct {
 	Time       string `json:"time"`
 	ID         string `json:"id"`
-	Data       string `json:"data"`
+	Message    string `json:"message"`
 	DeviceInfo string `json:"device_info"`
 }
 
-// PrepareData will do something
-func (mqtt_client Client) PrepareData(messageID string, inputData map[string]string) string {
-
+// Publish will do something
+func (mqtt_client Client) Publish(client mqtt.Client, topic string, message string) {
 	hostname, _ := os.Hostname()
-	ip := "unknown"
 	ipData, _ := net.LookupHost(hostname)
+	ip := "unknown"
 	if len(ipData) > 0 {
 		ip = fmt.Sprintf("%v", ipData[0])
 	}
 	res2D := &deviceInfo{
 		Address:  ip,
 		DeviceID: mqtt_client.ID,
-		Mac:      healpers.GetMacAddr(),
+		Mac:      helpers.GetMacAddr(),
 		Hostname: hostname}
 	res2B, err := json.Marshal(res2D)
-	jsonInput, err := json.Marshal(inputData)
 	if err != nil {
 		fmt.Printf("%s\n", err)
 	}
-
 	res1D := &mqttMessage{
-		Time:       healpers.GetDate(),
-		ID:         messageID,
-		Data:       string(jsonInput),
+		Time:       helpers.GetDate(),
+		Message:    message,
 		DeviceInfo: string(res2B)}
-	return strings.Replace(string(healpers.GetJSON(res1D)), "\\\"", "\"", -1)
+	token := client.Publish(topic, 2, false, strings.Replace(string(helpers.GetJSON(res1D)), "\\\"", "\"", -1))
+	token.Wait()
+	if token.Error() != nil {
+		log.Fatal(token.Error())
+	}
 }
+
+// PrepareData will do something
+// func (mqtt_client Client) PrepareData(messageID string, inputData map[string]string) string {
+
+// 	hostname, _ := os.Hostname()
+// 	ip := "unknown"
+// 	ipData, _ := net.LookupHost(hostname)
+// 	if len(ipData) > 0 {
+// 		ip = fmt.Sprintf("%v", ipData[0])
+// 	}
+// 	res2D := &deviceInfo{
+// 		Address:  ip,
+// 		DeviceID: mqtt_client.ID,
+// 		Mac:      helpers.GetMacAddr(),
+// 		Hostname: hostname}
+// 	res2B, err := json.Marshal(res2D)
+// 	jsonInput, err := json.Marshal(inputData)
+// 	if err != nil {
+// 		fmt.Printf("%s\n", err)
+// 	}
+
+// 	res1D := &mqttMessage{
+// 		Time:       helpers.GetDate(),
+// 		ID:         messageID,
+// 		Message:       string(jsonInput),
+// 		DeviceInfo: string(res2B)}
+// 	return strings.Replace(string(helpers.GetJSON(res1D)), "\\\"", "\"", -1)
+// }
