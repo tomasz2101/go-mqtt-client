@@ -13,8 +13,9 @@ import (
 	"github.com/tomasz2101/go-helpers"
 )
 
-// Client will do something
-type Client struct {
+// MQTTClient will do something
+type MQTTClient struct {
+	Client   mqtt.Client
 	Hostname string
 	Port     int
 	ID       string
@@ -23,40 +24,44 @@ type Client struct {
 }
 
 // ReturnURL will do sometihng
-func (mqtt_client Client) ReturnURL() string {
+func (m *MQTTClient) ReturnURL() string {
 	return "mqtt://internal:internal@localhost:1883/testing"
 }
 
 // Connect will do sometihng
-func (mqtt_client Client) Connect(postfixID string) mqtt.Client {
+func (m *MQTTClient) Connect(postfixID string) (mqtt.Client, error) {
 	// opts := createClientOptions(clientId, uri)
 	opts := mqtt.NewClientOptions()
-	opts.AddBroker(fmt.Sprintf("tcp://%s:%d", mqtt_client.Hostname, mqtt_client.Port))
-	opts.SetUsername(mqtt_client.Username)
-	opts.SetPassword(mqtt_client.Password)
-	opts.SetClientID(mqtt_client.ID + "/" + postfixID)
-	client := mqtt.NewClient(opts)
-	token := client.Connect()
+	opts.AddBroker(fmt.Sprintf("tcp://%s:%d", m.Hostname, m.Port))
+	opts.SetUsername(m.Username)
+	opts.SetPassword(m.Password)
+	opts.SetClientID(m.ID + "/" + postfixID)
+	m.Client = mqtt.NewClient(opts)
+	token := m.Client.Connect()
 	for !token.WaitTimeout(3 * time.Second) {
 	}
 	if err := token.Error(); err != nil {
 		log.Fatal(err)
 	}
-	return client
+	return m.Client, nil
 }
 
 // Listen will do something
-func (mqtt_client Client) Listen(topic string) {
-	fmt.Println("Listen")
-	client := mqtt_client.Connect("sub")
-	client.Subscribe(topic, 0, func(client mqtt.Client, msg mqtt.Message) {
-		fmt.Printf("* [%s] %s\n", msg.Topic(), string(msg.Payload()))
-	})
-}
+// func (m *MQTTClient) Listen(topic string) {
+// 	fmt.Println("Listen")
+// 	client := m.Client.Connect("sub")
+// 	client.Subscribe(topic, 0, func(client mqtt.Client, msg mqtt.Message) {
+// 		fmt.Printf("* [%s] %s\n", msg.Topic(), string(msg.Payload()))
+// 	})
+// }
 
 // EndConnection will disconnect client from broker
-func (mqtt_client Client) EndConnection(client mqtt.Client) {
-	client.Disconnect(250)
+func (m *MQTTClient) EndConnection() error {
+	if m.Client.IsConnected() {
+		m.Client.Disconnect(20)
+		fmt.Println("client disconnected")
+	}
+	return nil
 }
 
 type deviceInfo struct {
@@ -74,7 +79,7 @@ type mqttMessage struct {
 }
 
 // Publish will do something
-func (mqtt_client Client) Publish(client mqtt.Client, topic string, message string) {
+func (m *MQTTClient) Publish(topic string, message string) {
 	hostname, _ := os.Hostname()
 	ipData, _ := net.LookupHost(hostname)
 	ip := "unknown"
@@ -83,7 +88,7 @@ func (mqtt_client Client) Publish(client mqtt.Client, topic string, message stri
 	}
 	res2D := &deviceInfo{
 		Address:  ip,
-		DeviceID: mqtt_client.ID,
+		DeviceID: m.ID,
 		Mac:      helpers.GetMacAddr(),
 		Hostname: hostname}
 	res2B, err := json.Marshal(res2D)
@@ -94,7 +99,7 @@ func (mqtt_client Client) Publish(client mqtt.Client, topic string, message stri
 		Time:       helpers.GetDate(),
 		Message:    message,
 		DeviceInfo: string(res2B)}
-	token := client.Publish(topic, 2, false, strings.Replace(string(helpers.GetJSON(res1D)), "\\\"", "\"", -1))
+	token := m.Client.Publish(topic, 2, false, strings.Replace(string(helpers.GetJSON(res1D)), "\\\"", "\"", -1))
 	token.Wait()
 	if token.Error() != nil {
 		log.Fatal(token.Error())
@@ -102,7 +107,7 @@ func (mqtt_client Client) Publish(client mqtt.Client, topic string, message stri
 }
 
 // PrepareData will do something
-// func (mqtt_client Client) PrepareData(messageID string, inputData map[string]string) string {
+// func (m MQTTClient) PrepareData(messageID string, inputData map[string]string) string {
 
 // 	hostname, _ := os.Hostname()
 // 	ip := "unknown"
@@ -112,7 +117,7 @@ func (mqtt_client Client) Publish(client mqtt.Client, topic string, message stri
 // 	}
 // 	res2D := &deviceInfo{
 // 		Address:  ip,
-// 		DeviceID: mqtt_client.ID,
+// 		DeviceID: m.ID,
 // 		Mac:      helpers.GetMacAddr(),
 // 		Hostname: hostname}
 // 	res2B, err := json.Marshal(res2D)
